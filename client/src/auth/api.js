@@ -1,4 +1,29 @@
-const API_BASE = '/api';
+/**
+ * Where the API lives.
+ *
+ * The game has always been served by its own Node server, so every call could be
+ * relative — `/api/...` hits the same origin that served the page. That stops
+ * being true the moment the client is hosted anywhere else (Vercel, Netlify, a CDN)
+ * and the Express + Socket.IO server stays on a host with a disk: a relative
+ * `/api` would then hit Vercel, which has no such route, and every login would be
+ * a 404.
+ *
+ * So the origin is configurable at build time. With no `VITE_API_ORIGIN` set the
+ * value is empty and everything is exactly as relative as it has always been —
+ * the single-host deployment is untouched. Set it to the server's origin (for
+ * example `https://newlife-api.onrender.com`) and the same build talks to that
+ * server instead.
+ */
+export const API_ORIGIN = (import.meta.env?.VITE_API_ORIGIN || '').replace(/\/$/, '');
+
+const API_BASE = `${API_ORIGIN}/api`;
+
+/**
+ * The origin the Socket.IO client connects to, or `undefined` for same-origin.
+ * Multiplayer has the same problem as the REST calls: a socket to a static host
+ * connects to nothing.
+ */
+export const SOCKET_ORIGIN = API_ORIGIN || undefined;
 
 // ── One request path for the whole client ────────────────────
 //

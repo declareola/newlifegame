@@ -16,7 +16,9 @@ import { MapSystem } from './ui/MapSystem.js';
 import { NavigationSystem } from './nav/NavigationSystem.js';
 import { setInteractionPoints } from './world/interactionPoints.js';
 import { AuthScreen } from './auth/AuthScreen.js';
-import { getToken, getMe, clearToken, setToken, saveAppearance, getWanted } from './auth/api.js';
+import {
+  getToken, getMe, clearToken, setToken, saveAppearance, getWanted, SOCKET_ORIGIN,
+} from './auth/api.js';
 import { io } from 'socket.io-client';
 import { HUD } from './hud/HUD.js';
 import { Toast } from './hud/Toast.js';
@@ -654,7 +656,12 @@ function applyUserToAvatar(user) {
 }
 
 function connectGameSocket(token) {
-  const socket = io({ auth: { token } });
+  // Same-origin by default (the game's own server); the server's origin when the
+  // client is hosted separately — see API_ORIGIN in auth/api.js.
+  const socket = io(SOCKET_ORIGIN ?? undefined, {
+    auth: { token },
+    withCredentials: true,
+  });
   gameSocket = socket;
   jobBoard.setToken(token);
   activityPanel.setToken(token);
