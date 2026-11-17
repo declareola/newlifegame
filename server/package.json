@@ -1,0 +1,37 @@
+{
+  "name": "newlife-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "gen-secret": "node scripts/gen-secret.mjs",
+    "test": "node test-step9.mjs && node test-step10.mjs && node test-step11.mjs && node test-hardening.mjs && node test-session-economy.mjs && node test-exploits.mjs && node test-world.mjs && node test-utilities.mjs && node test-geometry.mjs && node test-wanted.mjs && node test-property-market.mjs",
+    "build:client": "npm --prefix ../client ci && npm --prefix ../client run build",
+    "start:prod": "NODE_ENV=production node src/index.js",
+    "test:redteam": "node test-exploits.mjs",
+    "clean-db": "node scripts/clean-db.mjs",
+    "clean-db:apply": "node scripts/clean-db.mjs --apply",
+    "test:world": "node test-world.mjs",
+    "test:wanted": "node test-wanted.mjs",
+    "test:geometry": "node test-geometry.mjs",
+    "gen:geometry": "node scripts/gen-geometry.mjs",
+    "test:property": "node test-property-market.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.7.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

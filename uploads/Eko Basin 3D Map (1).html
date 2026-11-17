@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eko Basin 3D Map</title>
+<style>
+:root{--panel:rgba(255,255,255,.93);--ink:#0f172a;--mut:#475569;--line:#cbd5e1;--btn:#e2e8f0;--btnink:#0f172a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--panel:rgba(12,18,34,.92);--ink:#e8eefc;--mut:#9fb0d0;--line:#27395f;--btn:#1b2a4a;--btnink:#e8eefc}}
+:root[data-theme="dark"]{--panel:rgba(12,18,34,.92);--ink:#e8eefc;--mut:#9fb0d0;--line:#27395f;--btn:#1b2a4a;--btnink:#e8eefc}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;position:relative;overflow:hidden;background:#0b1a38;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--ink)}
+#c{position:absolute;inset:0}
+#c canvas{display:block;width:100%;height:100%;touch-action:none}
+#ui{position:absolute;left:10px;top:10px;width:min(270px,calc(100% - 20px));background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.4;max-height:calc(100% - 30px);overflow:auto}
+summary{cursor:pointer;font-weight:700;font-size:15px;padding:2px 0}
+p{margin:6px 0;color:var(--mut)}
+h2{font-size:12px;margin:10px 0 4px;color:var(--mut);font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:5px}
+button{font:inherit;border:1px solid var(--line);background:var(--btn);color:var(--btnink);border-radius:7px;padding:5px 9px;cursor:pointer}
+button:hover{border-color:#5b8def}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid #5b8def;outline-offset:2px}
+label.t{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.lg div{padding:1px 0}
+#cmp{position:absolute;right:12px;bottom:12px;width:50px;height:50px;border-radius:50%;border:2px solid var(--line);background:var(--panel);display:flex;justify-content:center;font-weight:700;color:#ff5a5a;font-size:13px;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="c"></div>
+<div id="cmp"><span>N</span></div>
+<details id="ui" open>
+<summary>Eko Basin: 3D map</summary>
+<p>Drag to orbit, scroll or pinch to zoom, right-drag to pan.</p>
+<h2>Camera views</h2>
+<div class="row">
+<button data-v="overview">Overview</button><button data-v="core">Vertical Core</button><button data-v="docks">Docks</button><button data-v="main">Mainland</button><button data-v="west">Banana Island</button><button data-v="metro">Eko Metro</button><button data-v="top">Top-down</button>
+</div>
+<h2>Layers</h2>
+<label class="t"><input type="checkbox" data-l="fac" checked>Faction turf</label>
+<label class="t"><input type="checkbox" data-l="bld" checked>Buildings</label>
+<label class="t"><input type="checkbox" data-l="brg" checked>Bridges</label>
+<label class="t"><input type="checkbox" data-l="met" checked>Eko Metro line</label>
+<label class="t"><input type="checkbox" data-l="poi" checked>Points of interest</label>
+<label class="t"><input type="checkbox" data-l="lbl" checked>Labels</label>
+<label class="t"><input type="checkbox" data-l="dst" checked>District names</label>
+<label class="t"><input type="checkbox" data-l="mis" checked>Story mission pins</label>
+<label class="t"><input type="checkbox" id="xray" checked>See through ground</label>
+<label class="t"><input type="checkbox" id="spin">Auto-rotate</label>
+<label class="t"><input type="checkbox" id="night">Night mode</label>
+<h2>Legend</h2>
+<div class="lg">
+<div><span class="sw" style="background:#ff7a1a"></span>Mushin Street Kings (Outer Borough)</div>
+<div><span class="sw" style="background:#ffc83a"></span>Apapa Dockside Syndicate (Industrial North)</div>
+<div><span class="sw" style="background:#22e0ff"></span>Banana Island Cartel (Core and Banana Island)</div>
+<div><span class="sw" style="background:#ff3b3b"></span>Eko Metro line, stations and ambush zones</div>
+<div><span class="sw" style="background:#3ddc84"></span>Starting safehouses</div>
+<div><span class="sw" style="background:#8b5cf6"></span>Story mission pins (chapter number)</div>
+</div>
+<h2>Story missions (tap to fly there)</h2>
+<div class="row" id="mlist"></div>
+</details>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+var wrap=document.getElementById('c');
+if(!window.THREE||!THREE.OrbitControls){wrap.textContent='The 3D engine could not load. Check your connection and reload.';return;}
+var renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:true});}catch(e){wrap.textContent='WebGL is not available in this browser.';return;}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+wrap.appendChild(renderer.domElement);
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0b1a38);
+scene.fog=new THREE.Fog(0x0b1a38,170,420);
+var camera=new THREE.PerspectiveCamera(50,1,0.1,900);
+camera.position.set(0,80,85);
+var controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.maxPolarAngle=Math.PI/2.05;controls.minDistance=12;controls.maxDistance=240;controls.target.set(0,0,0);
+var hemi=new THREE.HemisphereLight(0xaac4ff,0x1a1a2e,0.95);scene.add(hemi);
+var sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(40,90,40);scene.add(sun);
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;var t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+var R=rng(11);
+function V(x,y,z){return new THREE.Vector3(x,y,z);}
+/* map pixel (from the reference image) to world units */
+function P(px,py){return [(px-700)/10,(py-390)/10];}
+function W(px,py,y){var p=P(px,py);return V(p[0],y||0,p[1]);}
+function grp(){var g=new THREE.Group();scene.add(g);return g;}
+var G={fac:grp(),bld:grp(),brg:grp(),met:grp(),poi:grp(),lbl:grp(),dst:grp(),mis:grp(),base:grp()};
+function box(w,h,d,x,y,z,col,par,em){var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,emissive:em||0,roughness:0.8}));m.position.set(x,y,z);par.add(m);return m;}
+function segs(pts,col,par){var l=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:col}));par.add(l);return l;}
+function polyline(pts,col,par){var l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:col}));par.add(l);return l;}
+
+/* water */
+var water=new THREE.Mesh(new THREE.PlaneGeometry(700,700),new THREE.MeshStandardMaterial({color:0x0F2042,transparent:true,opacity:0.6,roughness:1}));
+water.rotation.x=-Math.PI/2;water.position.y=-0.9;G.base.add(water);
+var grid=new THREE.GridHelper(700,140,0x1d3a70,0x132a52);grid.position.y=-0.85;G.base.add(grid);
+
+/* islands traced from the reference map */
+var groundMats=[];
+function mkIsland(px,col){
+  var pts=px.map(function(q){return P(q[0],q[1]);});
+  var sh=new THREE.Shape();pts.forEach(function(p,i){if(i){sh.lineTo(p[0],-p[1]);}else{sh.moveTo(p[0],-p[1]);}});
+  var geo=new THREE.ExtrudeGeometry(sh,{depth:1.4,bevelEnabled:false});geo.rotateX(-Math.PI/2);geo.translate(0,-1.4,0);
+  var mat=new THREE.MeshStandardMaterial({color:0x2a2d33,roughness:1,transparent:true,opacity:0.6});groundMats.push(mat);
+  G.base.add(new THREE.Mesh(geo,mat));
+  var sg=new THREE.ShapeGeometry(sh);sg.rotateX(-Math.PI/2);
+  var tm=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.2,depthWrite:false,side:THREE.DoubleSide}));tm.position.y=0.07;G.fac.add(tm);
+  var lp=pts.map(function(p){return V(p[0],0.14,p[1]);});
+  G.fac.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(lp),new THREE.LineBasicMaterial({color:col})));
+  var cx=0,cz=0;pts.forEach(function(p){cx+=p[0];cz+=p[1];});
+  return {pts:pts,c:[cx/pts.length,cz/pts.length]};
+}
+var NORTH=mkIsland([[330,238],[400,175],[500,135],[600,90],[615,60],[740,72],[800,86],[930,62],[1005,92],[980,135],[925,165],[840,195],[770,195],[722,232],[650,252],[560,240],[490,262],[440,292],[395,282],[345,252]],0xffc83a);
+var WEST=mkIsland([[48,498],[100,420],[190,330],[235,322],[335,348],[380,358],[372,392],[320,440],[262,480],[200,512],[105,516]],0x22e0ff);
+var CORE=mkIsland([[300,610],[300,560],[325,520],[360,495],[410,450],[480,400],[560,355],[650,315],[745,290],[800,300],[838,340],[825,385],[780,430],[720,480],[650,545],[590,600],[530,635],[430,640],[340,640]],0x22e0ff);
+var OUT=mkIsland([[990,350],[1020,280],[1050,235],[1090,205],[1140,190],[1190,185],[1240,200],[1300,205],[1345,230],[1355,330],[1330,420],[1305,470],[1270,520],[1230,570],[1200,600],[1150,640],[1100,680],[1040,700],[960,690],[900,700],[850,685],[830,650],[850,600],[890,520],[930,450],[970,390]],0xff7a1a);
+
+/* building placement inside island outlines */
+function inside(p,x,z){var c=false;for(var i=0,j=p.length-1;i<p.length;j=i++){if(((p[i][1]>z)!==(p[j][1]>z))&&(x<(p[j][0]-p[i][0])*(z-p[i][1])/(p[j][1]-p[i][1])+p[i][0]))c=!c;}return c;}
+function fill(isl,step,k,fn){
+  var cx=isl.c[0],cz=isl.c[1],x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+  var sp=isl.pts.map(function(p){var q=[cx+(p[0]-cx)*k,cz+(p[1]-cz)*k];x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);z0=Math.min(z0,q[1]);z1=Math.max(z1,q[1]);return q;});
+  for(var x=x0;x<x1;x+=step){for(var z=z0;z<z1;z+=step){var jx=x+(R()-0.5)*step*0.35,jz=z+(R()-0.5)*step*0.35;if(inside(sp,jx,jz))fn(jx,jz);}}
+}
+var bm=[];
+function inst(list,em){
+  var m=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({roughness:0.8,emissive:em}),list.length);
+  var o=new THREE.Object3D(),c=new THREE.Color();
+  list.forEach(function(b,i){o.position.set(b[0],b[1]/2+(b[6]||0),b[2]);o.scale.set(b[3],b[1],b[4]);o.updateMatrix();m.setMatrixAt(i,o.matrix);m.setColorAt(i,c.setHex(b[5]));});
+  m.instanceColor.needsUpdate=true;m.userData.e=em;G.bld.add(m);bm.push(m);
+}
+var cp=[0x3d4f73,0x4a5d86,0x34445f,0x56688f],cl=[],cc=P(580,470);
+fill(CORE,2.9,0.94,function(x,z){var d=Math.hypot(x-cc[0],(z-cc[1])*1.4);var h=3+Math.max(0,1-d/34)*15*(0.4+R()*0.9)+R()*3;cl.push([x,h,z,2.2,2.2,cp[Math.floor(R()*4)]]);});
+inst(cl,0x0b2a44);
+var op=[0x6b5b4b,0x7a6552,0x5d4f43,0x836c58],ol=[];
+fill(OUT,2.5,0.95,function(x,z){if(R()<0.05){ol.push([x,0.15,z,3.4,3.4,0x2f6d3c]);}else if(R()<0.88){ol.push([x,0.8+R()*R()*3,z,2,2,op[Math.floor(R()*4)]]);}});
+inst(ol,0x000000);
+var kc=[0xc0392b,0x2980b9,0xd4a017,0x27ae60,0x7f8c8d],nl=[];
+fill(NORTH,1.9,0.95,function(x,z){if(R()<0.1){nl.push([x,2.6,z,5,3,0x59606b]);}else if(R()<0.7){var st=1+Math.floor(R()*3);for(var s=0;s<st;s++){nl.push([x,1.1,z,1.7,1.2,kc[Math.floor(R()*5)],s*1.15]);}}});
+inst(nl,0x000000);
+var wl=[],wc=[0x59606b,0x6a7078,0x4a4f58];
+fill(WEST,3.3,0.93,function(x,z){if(R()<0.07){wl.push([x,0.15,z,3.6,3.6,0x2f6d3c]);}else if(R()<0.85){wl.push([x,0.8+R()*1.6,z,2.6,2.2,wc[Math.floor(R()*3)]]);}});
+inst(wl,0x000000);
+[[520,222],[580,200],[630,186],[765,146],[870,166],[930,126]].forEach(function(q){
+  var p=P(q[0],q[1]);
+  box(0.5,8,0.5,p[0],4,p[1]-1.3,0xe0a020,G.bld);box(0.5,8,0.5,p[0],4,p[1]+1.3,0xe0a020,G.bld);box(0.6,0.5,7,p[0],8,p[1],0xe0a020,G.bld);
+});
+
+/* bridges */
+function bez(a,c,b){return new THREE.QuadraticBezierCurve3(a,c,b).getPoints(30);}
+function span(A,B){var dx=B.x-A.x,dz=B.z-A.z,L=Math.hypot(dx,dz),ux=dx/L,uz=dz/L;return {A:A,B:B,L:L,at:function(t,y,o){return V(A.x+ux*t*L-uz*o,y,A.z+uz*t*L+ux*o);}};}
+function deck(s,w,y){var m=box(s.L,0.4,w,(s.A.x+s.B.x)/2,y,(s.A.z+s.B.z)/2,0x6b7280,G.brg);m.rotation.y=-Math.atan2(s.B.z-s.A.z,s.B.x-s.A.x);}
+function susp(A,B,t1,t2,H){
+  var s=span(A,B);deck(s,3.6,0.5);
+  [-1.9,1.9].forEach(function(o){
+    var T1=s.at(t1,H,o),T2=s.at(t2,H,o);
+    [t1,t2].forEach(function(t){var q=s.at(t,0,o);box(0.6,H,0.6,q.x,H/2,q.z,0x9aa4b2,G.brg);});
+    var parts=[bez(s.at(0,0.8,o),s.at(t1*0.5,H*0.28,o),T1),bez(T1,s.at((t1+t2)/2,H*0.3,o),T2),bez(T2,s.at(t2+(1-t2)*0.5,H*0.28,o),s.at(1,0.8,o))];
+    var hang=[];
+    parts.forEach(function(p){polyline(p,0xe5e7eb,G.brg);p.forEach(function(q,i){if(i%2===0&&q.y>1){hang.push(q.clone(),V(q.x,0.5,q.z));}});});
+    segs(hang,0x9aa4b2,G.brg);
+  });
+}
+function truss(A,B,H){
+  var s=span(A,B);deck(s,3.2,0.4);var ln=[];
+  [-1.7,1.7].forEach(function(o){
+    var p1=s.at(0.25,H,o),p2=s.at(0.75,H,o),a=s.at(0,0.4,o),b=s.at(1,0.4,o),m=s.at(0.5,0.4,o);
+    [0.25,0.75].forEach(function(t){var q=s.at(t,0,o);box(0.5,H,0.5,q.x,H/2,q.z,0xd9a021,G.brg);});
+    ln.push(p1,a,p1,m,p2,b,p2,m,p1,p2);
+  });
+  segs(ln,0xd9a021,G.brg);
+}
+susp(W(610,95),W(1245,535),0.34,0.57,11);
+truss(W(518,238),W(592,350),5);
+truss(W(745,470),W(925,565),4);
+
+/* Eko Metro: dotted underground lines and stations */
+var mlines=[[[232,398],[350,460],[475,525],[560,580],[700,592],[800,572],[905,480],[920,300],[1017,181],[1220,90]],[[350,460],[430,380],[580,310],[750,262],[920,255]],[[475,525],[718,454],[805,502],[925,565],[1010,470],[1122,353],[1224,260]]];
+var curves=mlines.map(function(l){return new THREE.CatmullRomCurve3(l.map(function(q){return W(q[0],q[1],-2);}),false,'catmullrom',0.3);});
+curves.forEach(function(c){
+  var pts=c.getSpacedPoints(Math.round(c.getLength()*1.6));
+  G.met.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(pts),new THREE.PointsMaterial({color:0xff3b3b,size:0.9})));
+});
+[[232,398],[350,460],[475,525],[718,454],[805,502],[925,565],[1122,353],[1224,260],[1017,181],[920,255]].forEach(function(q){
+  var p=P(q[0],q[1]);
+  var s=new THREE.Mesh(new THREE.SphereGeometry(0.8,16,12),new THREE.MeshBasicMaterial({color:0xffffff}));s.position.set(p[0],-2,p[1]);G.met.add(s);
+  var sh=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,2.2,8),new THREE.MeshBasicMaterial({color:0xff9a9a}));sh.position.set(p[0],-0.9,p[1]);G.met.add(sh);
+  var rg=new THREE.Mesh(new THREE.RingGeometry(0.9,1.5,28),new THREE.MeshBasicMaterial({color:0xff3b3b,side:THREE.DoubleSide}));rg.rotation.x=-Math.PI/2;rg.position.set(p[0],0.2,p[1]);G.met.add(rg);
+});
+var train=new THREE.Mesh(new THREE.SphereGeometry(0.6,12,10),new THREE.MeshBasicMaterial({color:0xfff0a8}));G.met.add(train);
+
+/* labels and icons */
+function label(lines,x,y,z,col,w){
+  var c=document.createElement('canvas');c.width=768;c.height=lines.length>1?112:64;
+  var g=c.getContext('2d');
+  g.fillStyle='rgba(8,16,36,0.82)';g.strokeStyle=col;g.lineWidth=4;
+  g.beginPath();g.moveTo(14,4);g.arcTo(c.width-4,4,c.width-4,c.height-4,14);g.arcTo(c.width-4,c.height-4,4,c.height-4,14);g.arcTo(4,c.height-4,4,4,14);g.arcTo(4,4,c.width-4,4,14);g.closePath();g.fill();g.stroke();
+  g.textAlign='center';g.fillStyle='#ffffff';
+  lines.forEach(function(t,n){
+    var fs=n===0?34:24;
+    do{g.font=(n===0?'700 ':'400 ')+fs+'px "Segoe UI",system-ui,sans-serif';fs--;}while(g.measureText(t).width>720&&fs>10);
+    g.fillText(t,c.width/2,n===0?(lines.length>1?46:42):88);
+  });
+  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
+  sp.scale.set(w,w*c.height/c.width,1);sp.position.set(x,y,z);sp.renderOrder=10;G.lbl.add(sp);return sp;
+}
+function L2(lines,px,py,y,col,w){var p=P(px,py);return label(lines,p[0],y,p[1],col,w);}
+function icon(ch,col,x,y,z,s,par){
+  var c=document.createElement('canvas');c.width=c.height=128;var g=c.getContext('2d');
+  g.fillStyle=col;g.beginPath();g.arc(64,64,58,0,Math.PI*2);g.fill();
+  g.fillStyle='#fff';g.font='700 78px "Segoe UI Symbol","Segoe UI",system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(ch,64,68);
+  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
+  sp.scale.set(s,s,1);sp.position.set(x,y,z);sp.renderOrder=11;par.add(sp);return sp;
+}
+
+/* points of interest */
+var vp=P(700,430);
+var diamond=new THREE.Mesh(new THREE.OctahedronGeometry(2.4),new THREE.MeshStandardMaterial({color:0x7ff3ff,emissive:0x1aa6c8,roughness:0.2}));
+diamond.position.set(vp[0],24,vp[1]);G.poi.add(diamond);
+segs([V(vp[0],22,vp[1]),V(vp[0],-2.6,vp[1])],0x7ff3ff,G.poi);
+box(5,1.6,4,vp[0],-2.6,vp[1],0xffc83a,G.poi,0x6b4b00);
+[[0,0.45],[1,0.5],[2,0.8]].forEach(function(a){var q=curves[a[0]].getPoint(a[1]);icon('\u2620','#d62828',q.x,q.y+1.8,q.z,3.2,G.poi);});
+[[1060,420],[1150,520],[1270,330]].forEach(function(q){
+  var p=P(q[0],q[1]);
+  box(1.7,1.2,1.7,p[0],0.6,p[1],0x3ddc84,G.poi,0x0d4d2a);
+  var roof=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.1,4),new THREE.MeshStandardMaterial({color:0x2fb36a,emissive:0x0d4d2a}));
+  roof.position.set(p[0],1.75,p[1]);roof.rotation.y=Math.PI/4;G.poi.add(roof);
+  icon('\u2302','#1f9d57',p[0],3.6,p[1],2.6,G.poi);
+});
+
+/* text labels */
+L2(['BANANA ISLAND CARTEL HOLDINGS','The Vertical Core: Lagos Island, Victoria Island, Ikoyi'],560,470,31,'#22e0ff',24);
+L2(['Banana Island: Cartel annex'],210,420,9,'#22e0ff',14);
+L2(['APAPA DOCKSIDE SYNDICATE OPERATIONS','The Industrial North: Apapa and Tin Can docks'],690,150,15,'#ffc83a',24);
+L2(['MUSHIN STREET KINGS TERRITORY','The Outer Borough: Mushin, Surulere, Oshodi'],1130,420,13,'#ff7a1a',24);
+L2(['HEIST TARGET: FEDERAL GOLD VAULT'],700,430,28,'#7ff3ff',17);
+L2(['LONG BRIDGE (Third Mainland style)'],970,340,17,'#e5e7eb',15);
+L2(['CANTILEVER BRIDGE (Carter / Eko style)'],555,290,10,'#e5e7eb',16);
+L2(['LINK BRIDGE (Lekki-Ikoyi style)'],835,505,8,'#e5e7eb',13);
+L2(['EKO METRO (underground)'],640,610,2,'#ff7b7b',12);
+L2(['STARTING SAFEHOUSES'],1150,520,8,'#3ddc84',11);
+[['Marina banking strip',470,560,10],['Victoria Island',380,520,8],['Eko Atlantic',800,330,12],['Mushin',1130,280,6],['Surulere',1000,520,6],['Oshodi motor park',1250,400,6],['Computer Village',1170,570,6],['Mile 12 market',1120,650,6],['Apapa wharf',500,170,5],['Tin Can port',880,120,5],['Ijora substation',400,230,5]].forEach(function(d){G.dst.add(L2([d[0]],d[1],d[2],d[3],'#9fb0d0',9));});
+
+/* story mission pins: chapter, name, pixel x, pixel y, height */
+var ms=[[1,'The Canteen',955,500,7],[2,'Scaffolding Sprint',1200,300,8],[5,'Cold Room',620,170,7],[7,'Contraband Co-Op',580,218,9],[13,'Switchyard',360,238,7],[18,'The Bedrock Job',700,430,26],[19,'Third Rail Run',580,310,3],[21,'Gala at Eko Atlantic',790,320,24],[22,'The Great Wall',480,625,22],[23,'Switch Night: power station',1200,215,10],[23,'Switch Night: control tower',600,470,24],[23,'Switch Night: harbor',850,110,8]];
+var ml=document.getElementById('mlist');
+ms.forEach(function(m){
+  var p=P(m[2],m[3]);
+  icon(String(m[0]),'#8b5cf6',p[0],m[4],p[1],3.6,G.mis);
+  segs([V(p[0],0,p[1]),V(p[0],m[4]-1.7,p[1])],0x8b5cf6,G.mis);
+  G.mis.add(label([m[1]],p[0],m[4]+3,p[1],'#8b5cf6',9));
+  var b=document.createElement('button');b.textContent=m[0]+'. '+m[1];
+  b.addEventListener('click',function(){goTo([p[0]+16,Math.max(m[4],6)+16,p[1]+26],[p[0],0,p[1]]);});
+  ml.appendChild(b);
+});
+
+/* night mode */
+var nt=document.getElementById('night');
+function setNight(on){
+  var bg=on?0x040815:0x0b1a38;scene.background.setHex(bg);scene.fog.color.setHex(bg);
+  hemi.intensity=on?0.3:0.95;sun.intensity=on?0.15:0.8;water.material.color.setHex(on?0x061024:0x0F2042);
+  bm.forEach(function(m){m.material.emissive.setHex(on?(m.userData.e?0xffc766:0x4a3510):m.userData.e);m.material.emissiveIntensity=on?0.45:1;});
+}
+nt.addEventListener('change',function(){setNight(nt.checked);});
+
+/* UI wiring */
+Array.prototype.forEach.call(document.querySelectorAll('[data-l]'),function(cb){
+  cb.addEventListener('change',function(){G[cb.getAttribute('data-l')].visible=cb.checked;});
+});
+var xr=document.getElementById('xray');
+function applyXray(){groundMats.forEach(function(m){m.opacity=xr.checked?0.6:1;});}
+xr.addEventListener('change',applyXray);applyXray();
+var spin=document.getElementById('spin');
+spin.addEventListener('change',function(){controls.autoRotate=spin.checked;controls.autoRotateSpeed=1.2;});
+var views={overview:[[0,80,85],[0,0,0]],core:[[-2,36,46],[-12,0,8]],docks:[[-1,32,12],[-1,0,-24]],main:[[41,42,45],[41,0,3]],west:[[-49,26,32],[-49,0,3]],metro:[[0,50,60],[0,-2,0]],top:[[0,165,1],[0,0,0]]};
+var tw=null;
+function goTo(p,t){tw={p0:camera.position.clone(),t0:controls.target.clone(),p1:V(p[0],p[1],p[2]),t1:V(t[0],t[1],t[2]),k:0};}
+Array.prototype.forEach.call(document.querySelectorAll('[data-v]'),function(b){
+  b.addEventListener('click',function(){var v=views[b.getAttribute('data-v')];goTo(v[0],v[1]);if(b.getAttribute('data-v')==='metro'){xr.checked=true;applyXray();}});
+});
+if(window.matchMedia&&window.matchMedia('(max-width:600px)').matches){document.getElementById('ui').removeAttribute('open');}
+var cmp=document.getElementById('cmp');
+
+function resize(){var w=wrap.clientWidth||window.innerWidth,h=wrap.clientHeight||window.innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);resize();
+
+var clock=new THREE.Clock(),t0=0;
+function loop(){
+  requestAnimationFrame(loop);
+  var dt=Math.min(clock.getDelta(),0.05);t0+=dt;
+  if(tw){tw.k=Math.min(1,tw.k+dt*1.3);var e=tw.k*tw.k*(3-2*tw.k);camera.position.lerpVectors(tw.p0,tw.p1,e);controls.target.lerpVectors(tw.t0,tw.t1,e);if(tw.k>=1)tw=null;}
+  diamond.rotation.y+=dt*0.9;diamond.position.y=24+Math.sin(t0*1.6)*0.5;
+  train.position.copy(curves[0].getPoint((t0*0.04)%1));
+  controls.update();
+  cmp.style.transform='rotate('+controls.getAzimuthalAngle()+'rad)';
+  renderer.render(scene,camera);
+}
+loop();
+})();
+</script>
+</body>
+</html>

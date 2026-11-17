@@ -1,0 +1,40 @@
+{
+  "name": "newlife-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node check-syntax.mjs && node test-bindings.mjs && node test-overlay.mjs && node test-render.mjs && node test-camera.mjs && node test-avatar.mjs && node test-onboarding.mjs && node test-remote-look.mjs && node test-polish.mjs && node test-assets.mjs && node test-audio.mjs && node test-streets.mjs && node test-interiors.mjs && node test-venues.mjs && node verify-world.mjs && node test-nav.mjs && node interior-stats.mjs && node scene-stats.mjs",
+    "stats": "node scene-stats.mjs",
+    "test:ui": "node test-ui.mjs",
+    "test:bindings": "node test-bindings.mjs",
+    "test:overlay": "node test-overlay.mjs",
+    "test:render": "node test-render.mjs",
+    "test:streets": "node test-streets.mjs",
+    "test:interiors": "node test-interiors.mjs",
+    "test:camera": "node test-camera.mjs",
+    "test:avatar": "node test-avatar.mjs",
+    "test:venues": "node test-venues.mjs",
+    "test:onboarding": "node test-onboarding.mjs",
+    "test:people": "node test-remote-look.mjs",
+    "test:audio": "node test-audio.mjs",
+    "test:polish": "node test-polish.mjs",
+    "test:assets": "node test-assets.mjs",
+    "test:home": "node test-home.mjs",
+    "assets": "bash fetch-assets.sh",
+    "shots": "node shots.mjs"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "socket.io-client": "^4.7.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "playwright-core": "^1.65.0",
+    "vite": "^5.0.0"
+  }
+}

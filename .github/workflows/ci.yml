@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      # ── Server ────────────────────────────────────────────────
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Create .env with a real secret
+        working-directory: server
+        run: |
+          cp .env.example .env
+          # A long random secret, so the production-safety checks pass.
+          printf 'JWT_SECRET=%s\n' "$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")" >> .env
+
+      - name: Start server
+        working-directory: server
+        run: |
+          npm start > /tmp/server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3000/api/health > /dev/null; then
+              echo "server up"; break
+            fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/api/health
+
+      - name: Run integration, hardening and red-team tests
+        working-directory: server
+        run: npm test
+
+      - name: Fail the build if the red-team suite finds a vulnerability
+        working-directory: server
+        run: |
+          # test-exploits.mjs exits non-zero if any exploit lands.
+          node test-exploits.mjs | tee /tmp/redteam.log
+          if grep -q "VULNERABLE: 0" /tmp/redteam.log; then
+            echo "No exploits landed."
+          else
+            echo "::error::Red-team exploits landed — see the log above."
+            exit 1
+          fi
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/server.log
+
+      # ── Client ────────────────────────────────────────────────
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build client
+        working-directory: client
+        run: npm run build
+
+      # ── Safety checks ─────────────────────────────────────────
+      - name: Fail if a weak JWT secret is committed
+        run: |
+          if grep -rn "your-super-secret-key-here\|dev-secret-change-me" \
+               server/src server/config 2>/dev/null; then
+            echo "::error::A placeholder JWT secret is referenced in source."
+            exit 1
+          fi
+          echo "No placeholder secrets in source."
+
+      - name: Ensure .env and the database are not committed
+        run: |
+          if [ -f server/.env ]; then
+            echo "::error::server/.env is committed — it must stay ignored."
+            exit 1
+          fi
+          if git ls-files | grep -q "^server/data/"; then
+            echo "::error::Database files are committed."
+            exit 1
+          fi
+          echo "No secrets or database files in the repo."

@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Real CC0 assets are fetched, not committed: bash fetch-assets.sh
+public/assets/

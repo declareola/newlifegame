@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit
+server/.env
+.env
+.env.local
+*.pem
+*.key
+
+# Database
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Local archives (full tarballs of the workspace, including the database)
+backups/
+*.tar.gz
+
+# Build output
+client/dist/
+dist/
+build/
+
+# Logs & OS noise
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Browser / CLI scratch state (Playwright's Chromium profile, crash reports)
+.config/
+.cache/
+.sudo_as_admin_successful
+
+# npm cache and local pki state
+.npm/
+.local/
+
+# Git bundles produced for handing the repo to a remote
+*.bundle
+deliverables/
